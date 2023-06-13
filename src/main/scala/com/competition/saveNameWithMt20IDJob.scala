@@ -9,9 +9,7 @@ import java.time.LocalDate
 
 case class nameWithMt20ID(name:String, mt20id:String)
 
-
-
-object saveShowDetailsJob {
+object saveNameWithMt20IDJob {
   val splitString = (x:String) => {
     val result = x.replace(" ","").replace("등","").split(",")
     result
@@ -32,7 +30,6 @@ object saveShowDetailsJob {
     val mt20ids = showInfos.select("mt20id").collect.map(v=>v(0).toString)
 
 
-
     var df : DataFrame = spark.emptyDataset[nameWithMt20ID].toDF()
     mt20ids.foreach{mt20id=>
       val showDetail : DataFrame =
@@ -50,7 +47,5 @@ object saveShowDetailsJob {
       .option("compression", "snappy")
       .saveAsTable("b_competition.name_with_mt20id")
 
-      //
-      //.parquet("nameWithMt20ID")
   }
 }
