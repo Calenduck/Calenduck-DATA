@@ -4,6 +4,8 @@ import com.competition.utils.DateUtils.changePattern
 import com.competition.utils.SparkUtils.getSparkSession
 import org.apache.spark.sql.{DataFrame, SaveMode}
 import org.apache.spark.sql.functions.{col, explode, udf}
+import java.util.Properties
+
 
 import java.time.LocalDate
 
@@ -41,11 +43,46 @@ object saveNameWithMt20IDJob {
       df = df.unionAll(tmpDf)
       Thread.sleep(600)
     }
-    df.repartition(1)
-      .write
+
+    // Configure the connection properties
+    val jdbcHostname = "competition.cjyqslqcsafp.ap-northeast-2.rds.amazonaws.com"
+    val jdbcPort = 3306
+    val jdbcDatabase = "competition"
+    val jdbcUsername = "competition"
+    val jdbcPassword = "!g794613"
+
+    val connectionProperties = new Properties()
+    connectionProperties.put("user", jdbcUsername)
+    connectionProperties.put("password", jdbcPassword)
+
+    val jdbcUrl = s"jdbc:mysql://$jdbcHostname:$jdbcPort/$jdbcDatabase"
+
+    // Create the table if it doesn't exist
+    val tableName = "name_with_mt20id"
+    val createTableQuery =
+      s"""CREATE TABLE IF NOT EXISTS $tableName (
+         |  name VARCHAR(100),
+         |  mt20id VARCHAR(100)
+         |)""".stripMargin
+
+    val connection = java.sql.DriverManager.getConnection(jdbcUrl, connectionProperties)
+    val statement = connection.createStatement()
+    statement.execute(createTableQuery)
+
+    // Save the DataFrame to AWS RDS
+    df.write
       .mode(SaveMode.Overwrite)
-      .option("compression", "snappy")
-      .saveAsTable("b_competition.name_with_mt20id")
+      .jdbc(jdbcUrl, tableName, connectionProperties)
+
+    statement.close()
+    connection.close()
+
+
+    //df.repartition(1)
+    //  .write
+    //  .mode(SaveMode.Overwrite)
+    //  .option("compression", "snappy")
+    //  .saveAsTable("b_competition.name_with_mt20id")
 
   }
 }
