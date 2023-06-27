@@ -43,15 +43,29 @@ object saveNameWithMt20IDJob {
     val showInfos : DataFrame = getShowInfoJob.getShowInfo(spark, from, to)
     val mt20ids = showInfos.select("mt20id").collect.map(v=>v(0).toString)
 
-    var detailInfoDf : DataFrame = spark.emptyDataset[nameWithMt20ID].toDF()
+    var detailInfoDf : DataFrame = spark.emptyDataset[detailInfo].toDF()
     var nameWithMt20idDf : DataFrame = spark.emptyDataset[nameWithMt20ID].toDF()
     mt20ids.foreach{mt20id=>
       val showDetail : DataFrame =
         getShowDetailJob.getShowDetail(spark, mt20id)
           .withColumn("names",splitUdf(col("prfcast")))
 
+      val tmpDetailDf = showDetail.select(
+        col("mt20id")
+        ,col("mt10id")
+        ,col("prfnm")
+        ,col("fcltynm")
+        ,col("prfcast")
+        ,col("prfcrew")
+        ,col("prfruntime")
+        ,col("prfage")
+        ,col("entrpsnm")
+        ,col("pcseguidance")
+        ,col("genrenm")
+      )
       val tmpDf = showDetail.select(explode($"names").alias("name"), col("mt20id"))
 
+      detailInfoDf = detailInfoDf.unionAll(tmpDetailDf)
       nameWithMt20idDf = nameWithMt20idDf.unionAll(tmpDf)
       Thread.sleep(600)
     }
@@ -69,13 +83,23 @@ object saveNameWithMt20IDJob {
 
     val jdbcUrl = s"jdbc:mysql://$jdbcHostname:$jdbcPort/$jdbcDatabase"
 
-    // Create the table if it doesn't exist
+    val connection = java.sql.DriverManager.getConnection(jdbcUrl, connectionProperties)
+    val statement = connection.createStatement()
+
+
     var tableName = "name_with_mt20id"
     var createTableQuery =
       s"""CREATE TABLE IF NOT EXISTS $tableName (
-         |  name VARCHAR(100),
-         |  mt20id VARCHAR(100)
-         |)""".stripMargin
+         |  mt20id varchar(255) NOT NULL,
+         |  name text,
+         |  PRIMARY KEY (mt20id)
+         |)
+         |""".stripMargin
+    statement.execute(createTableQuery)
+    nameWithMt20idDf.write
+      .mode(SaveMode.Overwrite)
+      .jdbc(jdbcUrl, tableName, connectionProperties)
+
 
     tableName = "detail_info"
     createTableQuery =
@@ -90,15 +114,11 @@ object saveNameWithMt20IDJob {
          |prfage VARCHAR(100),
          |entrpsnm VARCHAR(100),
          |pcseguidance VARCHAR(100),
-         |genrenm VARCHAR(100)
+         |genrenm VARCHAR(100),
+         |PRIMARY KEY (mt20id)
          |)""".stripMargin
-
-    val connection = java.sql.DriverManager.getConnection(jdbcUrl, connectionProperties)
-    val statement = connection.createStatement()
     statement.execute(createTableQuery)
-
-    // Save the DataFrame to AWS RDS
-    nameWithMt20idDf.write
+    detailInfoDf.write
       .mode(SaveMode.Overwrite)
       .jdbc(jdbcUrl, tableName, connectionProperties)
 

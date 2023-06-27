@@ -10,10 +10,10 @@ object SparkUtils {
 
   def getSparkSession(appName:String): SparkSession ={
     SparkSession.builder
-      .enableHiveSupport()
+      //.enableHiveSupport()
       .appName(appName)
       .config("spark.sql.session.timeZone", "Asia/Seoul")
-      //.master("local[*]")
+      .master("local[*]")
       .getOrCreate()
   }
 

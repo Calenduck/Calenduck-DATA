@@ -19,7 +19,7 @@ object getShowInfoJob {
       "stdate" -> from,
       "eddate" -> to,
       "cpage" -> "1",
-      "rows" -> "10",
+      "rows" -> "100000",
     )
     val queryString = params.map { case (k, v) => s"$k=$v" }.mkString("&")
     val url = new URL(apiURL + "?" + queryString)
